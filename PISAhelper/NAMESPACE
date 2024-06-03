@@ -1,0 +1,4 @@
+export(
+	"getcaf_deg", "getcaf0_deg", "scorediff"
+)
+
