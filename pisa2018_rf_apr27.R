@@ -9,12 +9,12 @@ library(ggplot2)
 library(ggrepel)
 setwd("/Users/radhika/Library/CloudStorage/GoogleDrive-rkap786@stanford.edu/My Drive/0. Projects - Stanford/PISA gender/Final code files revision/")
 
-source("Code/PISAhelper/R/scorediff.R")
-source("Code/PISAhelper/R/getcaf_deg.R")
-source("Code/PISAhelper/R/getcaf0_deg.R")
-source("Code/PISA_dataprep_funcs.R")
-source("Code/PISAhelper/R/integrate.R")
-source("Code/analysis_fncs.R")
+source("Code/PISAgender/PISAhelper/R/scorediff.R")
+source("Code/PISAgender/PISAhelper/R/getcaf_deg.R")
+source("Code/PISAgender/PISAhelper/R/getcaf0_deg.R")
+source("Code/PISAgender/PISA_dataprep_funcs.R")
+source("Code/PISAgender/PISAhelper/R/integrate.R")
+source("Code/PISAgender/analysis_fncs.R")
 
 
 ##########################################
@@ -93,7 +93,7 @@ g1= out |>
   geom_hline(yintercept = 0, linetype="dotted") +
   theme_classic(base_size = 15) + #geom_text(hjust=1.5, vjust=0) + 
   geom_label_repel(box.padding = 0.5, max.overlaps = Inf) + 
-  labs(x= "A (Girls- Boys)", y=lab1) 
+  labs(x= "A (females-males)", y=lab1) 
 
 
 figures="/Users/radhika/Library/CloudStorage/GoogleDrive-rkap786@stanford.edu/My Drive/0. Projects - Stanford/PISA gender/Final code files revision/Figures/"
@@ -115,10 +115,10 @@ g2= out |>
   geom_hline(yintercept = 0, linetype="dotted") +
   theme_classic(base_size = 14) + #geom_text(hjust=1.5, vjust=0) +
   geom_label_repel(box.padding = 0.5, max.overlaps = Inf) +
-  labs(x= "A (Girls-Boys)", y=lab1) 
+  labs(x= "A (females-males)", y=lab1) 
 
 
-ggsave(paste0(figures,"CAF_gminusb_fluency_As",".png"), plot=g2, height = 9, unit="cm")
+ggsave(paste0(figures,"CAF_gminusb_fluency_As",".png"), plot=g2, height = 8, unit="cm")
 
 
 
@@ -135,7 +135,7 @@ g3= out |>
   geom_hline(yintercept = 0, linetype="dotted") + #geom_text(hjust=1.5, vjust=0) +
   theme_classic(base_size = 14) + 
   geom_label_repel(box.padding = 0.5, max.overlaps = Inf) +
-  labs(x= "Mean score difference (Girls- Boys)", y="A_s (Girls-Boys)") 
+  labs(x= "Mean score difference (females- males)", y="A_s (Girls-Boys)") 
 
 
 ggsave(paste0(figures,"CAF_gminusb_fluency_As",".png"), plot=g3)

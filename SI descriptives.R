@@ -7,13 +7,12 @@ library(ggpubr)
 library(dplyr)
 library(ggplot2)
 setwd("/Users/radhika/Library/CloudStorage/GoogleDrive-rkap786@stanford.edu/My Drive/0. Projects - Stanford/PISA gender/Final code files revision/")
-
-source("Code/PISAhelper/R/scorediff.R")
-source("Code/PISAhelper/R/getcaf_deg.R")
-source("Code/PISAhelper/R/getcaf0_deg.R")
-source("Code/PISA_dataprep_funcs.R")
-source("Code/PISAhelper/R/integrate.R")
-source("Code/analysis_fncs.R")
+source("Code/PISAgender/PISAhelper/R/scorediff.R")
+source("Code/PISAgender/PISAhelper/R/getcaf_deg.R")
+source("Code/PISAgender/PISAhelper/R/getcaf0_deg.R")
+source("Code/PISAgender/PISA_dataprep_funcs.R")
+source("Code/PISAgender/PISAhelper/R/integrate.R")
+source("Code/PISAgender/analysis_fncs.R")
 #source("pisa scorediff plot oct22.R")
 #source("Updated code/caf estimation.R")
 #source("Updated code/plot_caftime.R")
@@ -21,7 +20,6 @@ source("Code/analysis_fncs.R")
 ##########################################
 #load("Data/Final data/read_fluency.Rdata")
 load("Data/Final data/science.Rdata")
-
 out=data.frame()
 for (i in 1:length(science)) {
   x=science[[i]] |>

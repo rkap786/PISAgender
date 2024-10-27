@@ -6,129 +6,98 @@ library(fs)
 library(ggpubr)
 library(dplyr)
 library(ggplot2)
-setwd("/Users/radhika/Library/CloudStorage/GoogleDrive-rkap786@stanford.edu/My Drive/0. Projects - Stanford/PISA gender/Final code files revision/")
-
-source("Code/PISAgender/PISAhelper/R/scorediff.R")
-source("Code/PISAgender/PISAhelper/R/getcaf_deg.R")
-source("Code/PISAgender/PISAhelper/R/getcaf0_deg.R")
-source("Code/PISAgender/PISA_dataprep_funcs.R")
-source("Code/PISAgender/PISAhelper/R/integrate.R")
-source("Code/PISAgender/analysis_fncs.R")
+setwd("/Users/radhika/Google Drive Stanford/PISA gender/Final code files/")
+source("Code/PISAhelper-additional/R/scorediff.R")
+source("Code/PISAhelper-additional/R/getcaf_deg.R")
+source("Code/PISAhelper-additional/R/getcaf0_deg.R")
+source("Code/PISA_dataprep_funcs.R")
 #source("pisa scorediff plot oct22.R")
 #source("Updated code/caf estimation.R")
 #source("Updated code/plot_caftime.R")
 
 ##########################################
-#load("Data/Final data/read_fluency.Rdata")
-load("Data/Final data/science.Rdata")
-#load("/Users/radhika/Google Drive Stanford/PISA gender/Data subsets and Code/country datasets/read_comprehension.Rdata")
+load("Data/Final data/read_comprehension.Rdata")
+#load("/Users/radhika/Google Drive Stanford/PISA gender/Final code files/Data/Final data/read_comprehension.Rdata")
+#load("/Users/radhika/Google Drive Stanford/PISA gender/Final code files/Data/Final data/math.Rdata")
 #load("/Users/radhika/Google Drive Stanford/PISA gender/Data subsets and Code/country datasets/math.Rdata")
-#load("/Users/radhika/Google Drive Stanford/PISA gender/Data subsets and Code/country datasets/science.Rdata")
+
+
+### Add ell status
+student_ell = read_csv("/Users/radhika/Google Drive Stanford/PISA gender/Final code files/Data/Final data/pisa2018_ell.csv")
+names(read_rc[[1]])
+names(student_ell)
+student_ell = student_ell |>
+  dplyr::rename(id=CNTSTUID)
+
+student_ell |> group_by(CNT) |> summarise(prop=mean(ell, na.rm=T)) |> 
+
+
 
 
 ## Statistics for each country
-# science_clean=list()
-# counter=1
-# for (i in 1:length(science)) {
-#   if(!is.null(science[[i]])){
-#     science_clean[[counter]]= science[[i]]
-#     counter=counter+1
-#   } 
-# }
-# rm(science)
-
-nstudents=as.data.frame(do.call(rbind, lapply(science, function(x) n_distinct(x$id))))
-sum(nstudents)
-nitems=as.data.frame(do.call(rbind, lapply(science, function(x) n_distinct(x$item))))
-
-meangender =as.data.frame(do.call(rbind, lapply(science, function(x) mean(x$gender,na.rm=T))))
-mean(as.vector(meangender)$V1)
-meanresp =as.data.frame(do.call(rbind, lapply(science, function(x) mean(x$resp,na.rm=T))))
-mean(as.vector(meanresp)$V1)
-
-nitems=as.data.frame(do.call(rbind, lapply(science, function(x) n_distinct(x$item))))
+ nstudents=as.data.frame(do.call(rbind, lapply(read_rc, function(x) n_distinct(x$id))))
+ nitems=as.data.frame(do.call(rbind, lapply(read_rc, function(x) n_distinct(x$item))))
+# 
+# 
+rtdist=do.call(rbind, lapply(read_rc, function(x) summary(x$rt)))
+rtdist= exp(rtdist)
+# summary(exp(do.call(rbind, lapply(read_rf, function(x) quantile(x$rt,0.01)))))
+# summary(exp(do.call(rbind, lapply(read_rf, function(x) quantile(x$rt,0.99)))))
 
 
-rtdist=do.call(rbind, lapply(science, function(x) summary(x$rt)))
-mean(rtdist[,3])
-summary(do.call(rbind, lapply(science, function(x) quantile(x$rt,0.01))))
-summary(do.call(rbind, lapply(science, function(x) quantile(x$rt,0.99))))
+# caf= getcaf0_deg(x,deg=2)
+# cafgrp= getcaf_deg(x,deg=2)
+#### estimate CAFs and adjusted difference
 
-for (i in 1:length(science)) {
-  x=science[[i]]
-  x|> group_by(gender) |>
-    summarise(mean(rt, na.rm=T), quantile(rt,0.25))
+# x=read_rc[[9]]
+# runpisahelper(x)
+runpisahelper= function(x) {
+  out=c()
+  x= left_join(x, student_ell, by=c("CNTRYID","CNT","id"))
   
+  #M<-by(x$resp,x$gender,mean)
+  #actual=M[[2]]-M[[1]]
+  # x$group= case_when(actual>0 & x$gender==1 ~ 1,
+  #                    actual>0 & x$gender==2 ~ 2,
+  #                    actual<0 & x$gender==1 ~ 2,
+  #                    actual<0 & x$gender==2 ~ 1)
+  # 
+  if(sum(!is.na(x$ell))!=0) {
+  x$group = ifelse(x$ell==0,2,x$ell)
+  x= x |>
+    filter(!is.na(group), 
+            !is.na(rt),
+            !is.na(resp)) 
+  qu= quantile(x$rt,0.99)
+  ql= quantile(x$rt,0.01)
+  x= x |>
+    filter(!is.na(group),
+           !is.na(rt),
+           !is.na(resp)) |>
+    filter(rt>=(ql) & rt<=(qu)) |>
+    group_by(item) |>
+    mutate(rt= scale(rt)) 
+  
+  result=round(scorediff(x, deg=2),4)
+  samplesize=n_distinct(x$id)
+  out=c(result, "N"=n_distinct(x$id),"cntid"=unique(x$CNTRYID), "cnt"= unique(x$CNT))
+  
+  #out= c("cntid"=unique(x$CNTRYID), "cnt"= unique(x$CNT), "N"=samplesize, "subject"=subject, "obs"=as.numeric(result[1]),"estdiff"=result[2], "adjc"=result[3],"adjs"=result[4])
+  }
+  out
 }
 
-rtdist=do.call(rbind, lapply(science, function(x) summary(x$rt)))
-
-
-
-
-#######Sensititvity check
-#quset= c(quantile(x$rt, 0.90), quantile(x$rt, 0.95), 190, quantile(x$rt, 0.99), 200, max(x$rt))
-#qlset= c(1, quantile(x$rt, 0.01), 3, quantile(x$rt, 0.05), quantile(x$rt, 0.1))
-
-rtdist=c()  
+  
 out=data.frame()
-for (i in 1:length(science)){
-  print(i)
-  xfull= science[[i]]
-  xfull= xfull |>
-    filter(BOOKID>=13 & BOOKID<=18) 
-  
-  xfull= filterdata(xfull, qu=0.99, ql=0.01) #drop 1% and log rt
-  tmp=runpisahelper(xfull, "science")
-  out=bind_rows(out, unlist(tmp))
-  
-  ## Time difference
-  rt1= xfull |> filter(gender==1) |> pull(rt)
-  rt2= xfull |> filter(gender==2) |> pull(rt)
-  rtdist=c(rtdist,mean(kld_base(rt1,rt2), kld_base(rt2,rt1)))
+for (i in 1:length(math)){
+  tmp=runpisahelper(math[[i]])
+  if (!is.null(tmp)){out=rbind(out, tmp)}
 }
+names(out)= c(names(result), "N", "cntid", "cnt")
 
-out[,c(1:4)] <- sapply(out[,c(1:4)],as.numeric)
-out=out |>  mutate(obvdir= (actualdiff-a_c >=0), truedir= (`est diff`-a_c >=0), match=obvdir==truedir)
-out$err= out$actualdiff-out$`est diff`
-out$rtdist= rtdist
-cntcode= read_csv("Data/Final data/pisa_country_codes.csv")
-out= merge(out, cntcode)
-write_csv(out,"Data/Final data/science_book13to18_results_q99q1.csv")
-#out2=read_csv("Data/Final data/science_book13to18_results_q99q1.csv") #quantile here was dropped before log rt
-# rtdist=c()  
-# out=data.frame()
-# for (i in 1:length(science)){
-#   print(i)
-#   xfull= science[[i]]
-#   xfull= xfull |>
-#     filter(BOOKID>=13 & BOOKID<=18)
-#   xfull= filterdata(xfull, qu=0.9, ql=0.1)
-#   tmp=runpisahelper(xfull, "science")
-#   out=bind_rows(out, unlist(tmp))
-#   
-#   ## Time difference
-#   rt1= xfull |> filter(gender==1) |> pull(rt)
-#   rt2= xfull |> filter(gender==2) |> pull(rt)
-#   rtdist=c(rtdist,mean(kld_base(rt1,rt2), kld_base(rt2,rt1)))
-# }
-# out[,c(1:4)] <- sapply(out[,c(1:4)],as.numeric)
-# out=out |>  mutate(obvdir= (actualdiff-a_c >=0), truedir= (`est diff`-a_c >=0), match=obvdir==truedir)
-# out$err= out$actualdiff-out$`est diff`
-# out$rtdist= rtdist
-# write_csv(out,"Data/Final data/science_book13to18_results_q90q10.csv")
-
-#### Load results
-out= read_csv("Data/Final data/science_book13to18_results_q99q1.csv")
-#out= out |> select(-cnt)
-
-
-out = out |> 
-  mutate(across(actualdiff:a_s, ~as.numeric(.x))) |>
-  mutate(across(actualdiff:a_s, ~round(.x,4))) |>
-  mutate(across(err:rtdist, ~round(.x,4))) 
-
-out |> group_by(match) |> summarise(mean(rtdist))
+out |> mutate(across(c("actualdiff", "a_c"), as.numeric)) |> 
+  mutate(diff=round(a_c-actualdiff, 4)) |> filter(abs(diff)>0.005) |> 
+  ggplot(aes(actualdiff, a_c)) + geom_point() + geom_abline(slope=1, intercept = 0)
 
 out |>
   mutate(across(c("actualdiff", "est diff","a_c","a_s"), as.numeric)) |>
@@ -142,126 +111,56 @@ out |>
   pull(adj_size_s) |>
   summary()
 
-## Difference
-out |> mutate(diff=actualdiff-a_c) |> group_by(match) |> summarise(mean(as.numeric(diff)))
 
-round(summary(as.numeric(out$actualdiff)),4)
-out$diff_per=((out$actualdiff-out$a_c)/out$actualdiff)*100
-round(summary(abs(out$err)),3)
-summary(out$rtdist)
-
-sum(out$N)
-mean(out$actualdiff)*100
-median(out$actualdiff)*100
-quantile(out$actualdiff,.75)*100
-quantile(out$actualdiff,.25)*100
-
-
-figures="/Users/radhika/Library/CloudStorage/GoogleDrive-rkap786@stanford.edu/My Drive/0. Projects - Stanford/PISA gender/Final code files revision/Figures/"
-lab1= TeX("$\\widehat{A_c}$")
-
-g1= out |> #filter(subject=="science", err<0.02,rtdist>0.01) |>
-  filter(subject=="science") |>
-  filter(actualdiff>=0) |> 
-  mutate(cntlab = ifelse(cnt=="QMR" | cnt=="BRA", cnt, "")) |>   #mutate(cntlab=cnt) |>mutate(cntlab= ifelse(match, "match", "notMatch")) |>
-  mutate(adjusted = as.numeric(a_c),
-         actual=as.numeric(actualdiff),
-         As= as.numeric(a_s)
-  ) |> #col= if_else(actual<adjusted, "blue", if_else(actual==adjusted,"black","red")),  #subject=factor(subject, levels=c("reading fluency", "reading other", "math")
-  ggplot(aes(x=actual, y= adjusted, col=cntlab,label=cntlab)) +
-  geom_point() + 
-  scale_color_manual(values =c("black","blue", "blue"), guide="none") +
-  geom_abline(intercept = 0, slope = 1,linetype="dotted") + 
-  geom_hline(yintercept = 0, linetype="dotted") +
-  theme_classic(base_size = 24) + geom_text(hjust=1, vjust=1, size=8) + 
-  labs(x= "A (males- females)", y=lab1) 
-
-ggsave(paste0(figures,"CAF_bminusg_science",".png"), plot=g1, height = 15, unit="cm")
-
-g2= out |>
-  filter(subject=="science") |> #, abs(err)<0.003,rtdist>0.01
-  filter(actualdiff<0) |>
-  mutate(cntlab = ifelse(cnt=="NLD"| cnt=="ARE", cnt, "")) |> #mutate(cntlab= ifelse(match, "match", "nM")) |>
+summary(-as.numeric(out$actualdiff))
+  
+g1= out |>
+  filter(subject=="reading fluency") |>
   mutate(adjusted = -as.numeric(a_c),
          actual=-as.numeric(actualdiff),
          As= -as.numeric(a_s)
   ) |> #col= if_else(actual<adjusted, "blue", if_else(actual==adjusted,"black","red")),  #subject=factor(subject, levels=c("reading fluency", "reading other", "math")
-  ggplot(aes(x=actual, y= adjusted, col=cntlab, label=cntlab)) +
-  geom_point() + geom_text(hjust=-0.2, vjust=1, size=8) + 
-  scale_color_manual(values =c("black","blue","blue"), guide="none") +
+  ggplot(aes(x=actual, y= adjusted, col=subject)) +
+  geom_point() + 
+  scale_color_manual(values ="blue", guide="none") +
   geom_abline(intercept = 0, slope = 1,linetype="dotted") + 
   geom_hline(yintercept = 0, linetype="dotted") +
-  theme_classic(base_size = 24) +
-  labs(x= "A (females- males)", y=lab1) 
-  #theme_minimal()  #facet_wrap(.~subject, nrow = 1) +
+  theme_classic(base_size = 10) +
+  labs(x= "Mean score difference (Girls- Boys)", y="Adjusted difference (Girls-Boys)") +
+  theme_minimal()  #facet_wrap(.~subject, nrow = 1) +
 
-ggsave(paste0(figures,"CAF_gminusb_science",".png"), plot=g2, height = 15, unit="cm")
-
-
-
-lab1= TeX("$\\widehat{A_s}$")
-g3= out |> #filter(subject=="science", err<0.02,rtdist>0.01) |>
-  filter(subject=="science") |>
-  filter(actualdiff>=0) |> 
-  mutate(cntlab = ifelse(cnt=="QMR" | cnt=="BRA", cnt, "")) |>   #mutate(cntlab=cnt) |>mutate(cntlab= ifelse(match, "match", "notMatch")) |>
-  mutate(adjusted = as.numeric(a_c),
-         actual=as.numeric(actualdiff),
-         As= as.numeric(a_s)
-  ) |> #col= if_else(actual<adjusted, "blue", if_else(actual==adjusted,"black","red")),  #subject=factor(subject, levels=c("reading fluency", "reading other", "math")
-  ggplot(aes(x=actual, y= As, col=cntlab,label=cntlab)) +
-  geom_point() + 
-  scale_color_manual(values =c("black","blue", "blue"), guide="none") +
-  geom_hline(yintercept = 0, linetype="dotted") +
-  theme_classic(base_size = 24) + geom_text(hjust=1, vjust=1.3, size=8) + 
-  labs(x= "A (males-females)", y=lab1
-       ) #facet_wrap(.~subject, nrow = 1) +
-ggsave(paste0(figures,"CAF_bminusg_science_As",".png"), plot=g3, height = 15, unit="cm")
-
-g4= out |>
-  filter(subject=="science") |> #, abs(err)<0.003,rtdist>0.01
-  filter(actualdiff<0) |>
-  mutate(cntlab = ifelse(cnt=="NLD" | cnt=="ARE", cnt, "")) |>
+out |>
+  filter(subject=="reading fluency") |>
   mutate(adjusted = -as.numeric(a_c),
-         actual=-as.numeric(actualdiff),
-         As= -as.numeric(a_s)
+         actual=-as.numeric(obs),
+         estimated= -as.numeric(`estdiff.est diff`)
   ) |> #col= if_else(actual<adjusted, "blue", if_else(actual==adjusted,"black","red")),  #subject=factor(subject, levels=c("reading fluency", "reading other", "math")
-  ggplot(aes(x=actual, y= As,col=cntlab,label=cntlab)) +
-  geom_point() + #geom_text(hjust=-0.5, vjust=-0.2) + scale_color_manual(values =c("black","blue","blue"), guide="none") +
-    scale_color_manual(values =c("black","blue", "blue"), guide="none") +
-  geom_hline(yintercept = 0, linetype="dotted") + geom_text(hjust=0.5, vjust=-0.5, size=8) +
-  theme_classic(base_size = 24) +
-  labs(x= "A (females- males)", y=lab1) 
-#theme_minimal()  #facet_wrap(.~subject, nrow = 1) +
-
-ggsave(paste0(figures,"CAF_gminusb_science_As",".png"), plot=g4, height = 15, unit="cm")
-
-### Which countries have small time differences
-# g3= out |>
-#   filter(subject=="science", abs(err)<0.003) |>
-#   filter(actualdiff<0) |>
-#   mutate(timelab = ifelse(rtdist<0.01,"Similar rt", "Different rt")) |>
-#   mutate(adjusted = -as.numeric(a_c),
-#          actual=-as.numeric(actualdiff),
-#          As= as.numeric(a_s)
-#   ) |> #col= if_else(actual<adjusted, "blue", if_else(actual==adjusted,"black","red")),  #subject=factor(subject, levels=c("reading fluency", "reading other", "math")
-#   ggplot(aes(x=actual, y= adjusted, col=timelab)) +
-#   geom_point() +
-#   scale_color_manual(values =c("blue","black"), guide="none") +
-#   geom_abline(intercept = 0, slope = 1,linetype="dotted") + 
-#   geom_hline(yintercept = 0, linetype="dotted") +
-#   theme_classic(base_size = 10) +
-#   labs(x= "Mean score difference (Girls- Boys)", y="Adjusted difference (Girls-Boys)") +
-#   theme_minimal() 
-
-#p1= plotpisa(out)
-# p2= plotpisa(out, "reading other")
-# p3= plotpisa(out, "math")
-# ggarrange(p1,p2,p3,
-#           common.legend = T,legend="none",
-#           align = "h", nrow=3) 
+  ggplot(aes(x=actual, y= adjusted, label=cnt)) +
+  geom_point() +
+  facet_wrap(.~subject, nrow = 1) +
+  geom_abline(intercept = 0, slope =1,linetype="dotted") +
+  labs(x= "Mean score difference (Girls- Boys)", y="Adjusted difference (Girls-Boys)") +
+  theme_minimal()
 
 
+g1= out |>
+  filter(subject=="reading fluency") |>
+  mutate(adjusted = as.numeric(adjc.a_c),
+         actual=as.numeric(obs),
+  ) |> #col= if_else(actual<adjusted, "blue", if_else(actual==adjusted,"black","red")),  #subject=factor(subject, levels=c("reading fluency", "reading other", "math")
+  ggplot(aes(x=actual, y= adjusted, label=cnt)) +
+  geom_point() +
+  facet_wrap(.~subject, nrow = 1) +
+  ylim(-0.1,0.1) +xlim(-0.1,0.08) +
+  geom_abline(intercept = 0, slope = 1,linetype="dotted") +
+  geom_vline(xintercept = 0, linetype="dotted") + theme_classic(base_size = 8) +
+  theme(legend.position = "none") +
+  labs(x ="Observed difference A (female-male)", y = "Adjusted difference A' (female-male)")  +
+  scale_color_manual(values=c("blue", "red")) +
+  ggtitle("Adjusted vs observed score")
 
+
+summary(country_desc$resp_diff)
 
 # g4= country_desc %>% 
 #   mutate(resp_diff=as.numeric(resp_diff),
@@ -312,33 +211,57 @@ ggsave(paste0(figures,"CAF_gminusb_science_As",".png"), plot=g4, height = 15, un
 #   summarise(medcount= min(count)) |>
 #   arrange(medcount)
 
+out_caf=cafcomplied(x)
 
-# 
-# plotCAF = function(out_caf,x, tmp) {
-#   library(ggplot2)
-#   library(cowplot)
-#   x$group= x$gender
-#   gcaf= out_caf  |> 
-#     ggplot(aes(rt, prob, color=group)) + geom_line() +
-#     scale_color_manual(values=c("red", "blue", "black"))  +xlab("log t (seconds)") + ylab("Accuracy offset") +
-#     theme(legend.position = "bottom") + guides(colour = guide_legend(nrow = 2)) +
-#     scale_x_continuous(breaks = c(seq(0, 7, 1)), limits = c(0,7)) 
-#   image0= paste0(unique(out_caf$cnt), " ", unique(out_caf$subject))
-#   caption0= paste0(unique(out_caf$cnt), " ", unique(out_caf$subject),"\n A:", 
-#                    round(as.numeric(tmp[5]),4), "; A_c:", round(as.numeric(tmp[7]),4))
-#   gtime= x |> ggplot(aes(rt, group=factor(group), color= factor(group))) + geom_density() + 
-#     scale_color_manual(values=c("red", "blue")) +
-#     theme(legend.position = "bottom")  + labs(caption = caption0) +
-#     scale_x_continuous(breaks = c(seq(0, 7, 1)), limits = c(0,7)) 
-#   
-#   plot0= ggarrange(gcaf,gtime, ncol=1,common.legend = TRUE, legend = "bottom",
-#                    align = "hv")
-#   ggsave(paste0("/Users/radhika/Google Drive Stanford/PISA gender/Graphs/Country CAFs/",image0,".png"), plot=plot0)
-#   #aligned= align_plots(gcaf, gtime, align = "v")
-#   #plot_grid(aligned[[1]],aligned[[2]], ncol = 1, align = "h", ) 
-#   
-#   return(plot)
-# }
+
+
+cafcomplied = function(x) {
+  # x$group = x$gender
+  # x = x |>
+  #   filter(!is.na(rt),
+  #          !is.na(group))
+  caf<-getcaf_deg(x, deg=2) 
+  caf0=getcaf0_deg(x, deg=2)
+  
+  out1= data.frame(cbind(caf[[1]], rep("Group 1",1000)))
+  out2= data.frame(cbind(caf[[2]], rep("Group 2",1000)))
+  out3= data.frame(cbind(caf0, rep("Merged",1000)))
+  out_caf = rbind(out1, out2, out3)
+  
+  names(out_caf) = c("rt", "prob", "group")
+  
+  #names(out_caf) = c("rt", "prob", "cntryID", "subject", "group")
+  out_caf$rt = as.numeric(out_caf$rt) # V1 is time, V2 is accuracy prediction
+  out_caf$prob= as.numeric(out_caf$prob)
+  return(out_caf)
+  
+}
+
+plotCAF = function(out_caf,x, tmp) {
+  library(ggplot2)
+  library(cowplot)
+  #x$group= x$gender
+  gcaf= out_caf  |> 
+    ggplot(aes(rt, prob, color=group)) + geom_line() +
+    scale_color_manual(values=c("red", "blue", "black"))  +xlab("log t (seconds)") + ylab("Accuracy offset") +
+    theme(legend.position = "bottom") + guides(colour = guide_legend(nrow = 2)) +
+    scale_x_continuous(breaks = c(seq(0, 7, 1)), limits = c(0,7)) 
+  image0= paste0(unique(out_caf$cnt), " ", unique(out_caf$subject))
+  caption0= paste0(unique(out_caf$cnt), " ", unique(out_caf$subject),"\n A:", 
+                   round(as.numeric(tmp[5]),4), "; A_c:", round(as.numeric(tmp[7]),4))
+  gtime= x |> ggplot(aes(rt, group=factor(group), color= factor(group))) + geom_density() + 
+    scale_color_manual(values=c("red", "blue")) +
+    theme(legend.position = "bottom")  + labs(caption = caption0) +
+    scale_x_continuous(breaks = c(seq(0, 7, 1)), limits = c(0,7)) 
+  
+  plot0= ggarrange(gcaf,gtime, ncol=1,common.legend = TRUE, legend = "bottom",
+                   align = "hv")
+  ggsave(paste0("/Users/radhika/Google Drive Stanford/PISA gender/Graphs/Country CAFs/",image0,".png"), plot=plot0)
+  #aligned= align_plots(gcaf, gtime, align = "v")
+  #plot_grid(aligned[[1]],aligned[[2]], ncol = 1, align = "h", ) 
+  
+  return(plot)
+}
 
 
 #### Save CAFs images
@@ -425,28 +348,7 @@ ggsave(paste0(figures,"CAF_gminusb_science_As",".png"), plot=g4, height = 15, un
 
 #out= read_csv("/Users/radhika/Google Drive Stanford/PISA gender/Data subsets and Code/group_diff_adjusted v3.csv")
 ### Save graphs
-# 
-# cafcomplied = function(x) {
-#   x$group = x$gender
-#   x = x |>
-#     filter(!is.na(rt),
-#            !is.na(group))
-#   caf<-getcaf(x, deg=2) 
-#   caf0=getcaf0(x, deg=2)
-#   
-#   out1= data.frame(cbind(caf[[1]], rep("Group 1",1000)))
-#   out2= data.frame(cbind(caf[[2]], rep("Group 2",1000)))
-#   out3= data.frame(cbind(caf0, rep("Merged",1000)))
-#   out_caf = rbind(out1, out2, out3)
-#   
-#   names(out_caf) = c("rt", "prob", "group")
-#   
-#   #names(out_caf) = c("rt", "prob", "cntryID", "subject", "group")
-#   out_caf$rt = as.numeric(out_caf$rt) # V1 is time, V2 is accuracy prediction
-#   out_caf$prob= as.numeric(out_caf$prob)
-#   return(out_caf)
-#   
-# }
+
 # 
 # out=data.frame()
 # for (i in 1:length(math)){
@@ -471,8 +373,26 @@ ggsave(paste0(figures,"CAF_gminusb_science_As",".png"), plot=g4, height = 15, un
 ################################################
 # Graphs on full data
 ################################################
-# library(readr)
-#
+library(readr)
+# out = read_csv("/Users/radhika/Google Drive Stanford/PISA gender/Data subsets and Code/group_diff_adjusted.csv")
+names(out)
+#p1= plotpisa(out)
+# p2= plotpisa(out, "reading other")
+# p3= plotpisa(out, "math")
+# ggarrange(p1,p2,p3,
+#           common.legend = T,legend="none",
+#           align = "h", nrow=3) 
+
+
+###### Plot  caf
+plots=list()
+for (i in 1:length(read_rf)) {
+  x=read_rf[[1]]
+  x$group= x$gender
+  caf= getcaf(x, deg=2)
+  plots=plotcaf(caf, unique(x$CNT))
+}
+
 
 
 
